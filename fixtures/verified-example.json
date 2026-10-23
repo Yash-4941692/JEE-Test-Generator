@@ -1,0 +1,160 @@
+{
+  "id": "fixtureVer1",
+  "meta": {
+    "title": "Circular Motion \u2014 Complete One Shot for JEE Main",
+    "channel": "Physics Wallah Foundation",
+    "lengthSeconds": 1625,
+    "description": "Circular Motion complete revision for JEE Main 2026.\n\nTopics covered:\n0:00 Introduction to Circular Motion\n1:35 Angular Displacement and Angular Velocity\n4:18 Relation Between Linear and Angular Speed\n7:10 Centripetal Acceleration Derivation\n10:12 Why the Direction of Velocity Changes\n13:00 Solved Problem 1: Car on a Circular Track\n15:55 Banking of Roads and the Optimum Speed\n19:00 Solved Problem 2: Banking with Friction\n22:00 Vertical Circular Motion and Minimum Speed\n25:00 Summary and Revision Checklist\n\nNotes PDF: https://example.com/notes/circular-motion.pdf\nJoin the Telegram group for doubts: https://example.com/telegram\n"
+  },
+  "chapters": [
+    {
+      "startMs": 0,
+      "label": "Introduction to Circular Motion"
+    },
+    {
+      "startMs": 95000,
+      "label": "Angular Displacement and Angular Velocity"
+    },
+    {
+      "startMs": 258000,
+      "label": "Relation Between Linear and Angular Speed"
+    },
+    {
+      "startMs": 430000,
+      "label": "Centripetal Acceleration Derivation"
+    },
+    {
+      "startMs": 612000,
+      "label": "Why the Direction of Velocity Changes"
+    },
+    {
+      "startMs": 780000,
+      "label": "Solved Problem 1: Car on a Circular Track"
+    },
+    {
+      "startMs": 955000,
+      "label": "Banking of Roads and the Optimum Speed"
+    },
+    {
+      "startMs": 1140000,
+      "label": "Solved Problem 2: Banking with Friction"
+    },
+    {
+      "startMs": 1320000,
+      "label": "Vertical Circular Motion and Minimum Speed"
+    },
+    {
+      "startMs": 1500000,
+      "label": "Summary and Revision Checklist"
+    }
+  ],
+  "captionTrack": {
+    "languageCode": "en",
+    "name": "English",
+    "kind": "asr"
+  },
+  "captionsJson3": {
+    "wireMagic": "pb3",
+    "events": [
+      {
+        "tStartMs": 0,
+        "dDurationMs": 6000,
+        "segs": [
+          {
+            "utf8": "in this lecture we are going to complete circular motion"
+          }
+        ]
+      },
+      {
+        "tStartMs": 7000,
+        "dDurationMs": 5000,
+        "segs": [
+          {
+            "utf8": "first let us understand angular displacement"
+          }
+        ]
+      },
+      {
+        "tStartMs": 96000,
+        "dDurationMs": 6000,
+        "segs": [
+          {
+            "utf8": "so angular displacement is the angle through which"
+          }
+        ]
+      },
+      {
+        "tStartMs": 300000,
+        "dDurationMs": 5000,
+        "segs": [
+          {
+            "utf8": "the relation between v and omega is v equals r omega"
+          }
+        ]
+      },
+      {
+        "tStartMs": 431000,
+        "dDurationMs": 6000,
+        "segs": [
+          {
+            "utf8": "now let us derive the centripetal acceleration"
+          }
+        ]
+      },
+      {
+        "tStartMs": 613000,
+        "dDurationMs": 5000,
+        "segs": [
+          {
+            "utf8": "and here you can see the velocity direction changes"
+          }
+        ]
+      },
+      {
+        "tStartMs": 781000,
+        "dDurationMs": 6000,
+        "segs": [
+          {
+            "utf8": "let us solve the first problem of a car on a circular track"
+          }
+        ]
+      },
+      {
+        "tStartMs": 956000,
+        "dDurationMs": 5000,
+        "segs": [
+          {
+            "utf8": "moving on to banking of roads"
+          }
+        ]
+      },
+      {
+        "tStartMs": 1141000,
+        "dDurationMs": 6000,
+        "segs": [
+          {
+            "utf8": "next question is banking with friction"
+          }
+        ]
+      },
+      {
+        "tStartMs": 1321000,
+        "dDurationMs": 5000,
+        "segs": [
+          {
+            "utf8": "now vertical circular motion and the minimum speed"
+          }
+        ]
+      },
+      {
+        "tStartMs": 1501000,
+        "dDurationMs": 5000,
+        "segs": [
+          {
+            "utf8": "finally the summary and revision checklist"
+          }
+        ]
+      }
+    ]
+  }
+}

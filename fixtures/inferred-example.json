@@ -1,0 +1,485 @@
+{
+  "id": "fixtureInf1",
+  "meta": {
+    "title": "Second Law of Thermodynamics \u2014 Full Lecture",
+    "channel": "Physics Galaxy",
+    "lengthSeconds": 322,
+    "description": "Complete lecture on the second law of thermodynamics, entropy and the carnot cycle.\n\nJoin the course: https://example.com/course\ntelegram: https://example.com/telegram\n"
+  },
+  "chapters": [],
+  "captionTrack": {
+    "languageCode": "en",
+    "name": "English (auto-generated)",
+    "kind": "asr"
+  },
+  "captionsJson3": {
+    "wireMagic": "pb3",
+    "events": [
+      {
+        "tStartMs": 0,
+        "dDurationMs": 6000,
+        "segs": [
+          {
+            "utf8": "ok so in today's lecture we will finish the second law of thermodynamics"
+          }
+        ]
+      },
+      {
+        "tStartMs": 6000,
+        "dDurationMs": 6000,
+        "segs": [
+          {
+            "utf8": "we will start with the basics and slowly move to the carnot cycle"
+          }
+        ]
+      },
+      {
+        "tStartMs": 13000,
+        "dDurationMs": 6000,
+        "segs": [
+          {
+            "utf8": "before that a quick recap of the first law"
+          }
+        ]
+      },
+      {
+        "tStartMs": 20000,
+        "dDurationMs": 6000,
+        "segs": [
+          {
+            "utf8": "the first law is just energy conservation for a gas"
+          }
+        ]
+      },
+      {
+        "tStartMs": 30000,
+        "dDurationMs": 6000,
+        "segs": [
+          {
+            "utf8": "so now let's move on to the second law of thermodynamics"
+          }
+        ]
+      },
+      {
+        "tStartMs": 38000,
+        "dDurationMs": 6000,
+        "segs": [
+          {
+            "utf8": "the second law tells us the direction of heat flow"
+          }
+        ]
+      },
+      {
+        "tStartMs": 46000,
+        "dDurationMs": 6000,
+        "segs": [
+          {
+            "utf8": "heat always flows from a hotter body to a colder body"
+          }
+        ]
+      },
+      {
+        "tStartMs": 55000,
+        "dDurationMs": 6000,
+        "segs": [
+          {
+            "utf8": "kelvin planck and clausius statements are the two versions"
+          }
+        ]
+      },
+      {
+        "tStartMs": 66000,
+        "dDurationMs": 6000,
+        "segs": [
+          {
+            "utf8": "as we discussed earlier when we looked at heat engines this matters a lot"
+          }
+        ]
+      },
+      {
+        "tStartMs": 75000,
+        "dDurationMs": 6000,
+        "segs": [
+          {
+            "utf8": "next topic is entropy"
+          }
+        ]
+      },
+      {
+        "tStartMs": 83000,
+        "dDurationMs": 6000,
+        "segs": [
+          {
+            "utf8": "entropy is a measure of the disorder of the system"
+          }
+        ]
+      },
+      {
+        "tStartMs": 92000,
+        "dDurationMs": 6000,
+        "segs": [
+          {
+            "utf8": "the change in entropy is the integral of dq over t"
+          }
+        ]
+      },
+      {
+        "tStartMs": 104000,
+        "dDurationMs": 6000,
+        "segs": [
+          {
+            "utf8": "for a reversible process this is exact"
+          }
+        ]
+      },
+      {
+        "tStartMs": 112000,
+        "dDurationMs": 6000,
+        "segs": [
+          {
+            "utf8": "now let's look at heat engines"
+          }
+        ]
+      },
+      {
+        "tStartMs": 120000,
+        "dDurationMs": 6000,
+        "segs": [
+          {
+            "utf8": "a heat engine takes heat from a hot reservoir"
+          }
+        ]
+      },
+      {
+        "tStartMs": 130000,
+        "dDurationMs": 6000,
+        "segs": [
+          {
+            "utf8": "and converts part of it into work"
+          }
+        ]
+      },
+      {
+        "tStartMs": 139000,
+        "dDurationMs": 6000,
+        "segs": [
+          {
+            "utf8": "the efficiency is one minus q two by q one"
+          }
+        ]
+      },
+      {
+        "tStartMs": 150000,
+        "dDurationMs": 6000,
+        "segs": [
+          {
+            "utf8": "no engine can be one hundred percent efficient"
+          }
+        ]
+      },
+      {
+        "tStartMs": 160000,
+        "dDurationMs": 6000,
+        "segs": [
+          {
+            "utf8": "let's now discuss the carnot cycle"
+          }
+        ]
+      },
+      {
+        "tStartMs": 169000,
+        "dDurationMs": 6000,
+        "segs": [
+          {
+            "utf8": "the carnot cycle has four reversible processes"
+          }
+        ]
+      },
+      {
+        "tStartMs": 178000,
+        "dDurationMs": 6000,
+        "segs": [
+          {
+            "utf8": "two isothermal and two adiabatic"
+          }
+        ]
+      },
+      {
+        "tStartMs": 188000,
+        "dDurationMs": 6000,
+        "segs": [
+          {
+            "utf8": "the efficiency depends only on the two temperatures"
+          }
+        ]
+      },
+      {
+        "tStartMs": 199000,
+        "dDurationMs": 6000,
+        "segs": [
+          {
+            "utf8": "next we come to refrigerators and heat pumps"
+          }
+        ]
+      },
+      {
+        "tStartMs": 209000,
+        "dDurationMs": 6000,
+        "segs": [
+          {
+            "utf8": "a refrigerator is the reverse of a heat engine"
+          }
+        ]
+      },
+      {
+        "tStartMs": 220000,
+        "dDurationMs": 6000,
+        "segs": [
+          {
+            "utf8": "the coefficient of performance is the useful effect by the work input"
+          }
+        ]
+      },
+      {
+        "tStartMs": 233000,
+        "dDurationMs": 6000,
+        "segs": [
+          {
+            "utf8": "moving on to the solved examples now"
+          }
+        ]
+      },
+      {
+        "tStartMs": 243000,
+        "dDurationMs": 6000,
+        "segs": [
+          {
+            "utf8": "first question is a carnot engine operating between two temperatures"
+          }
+        ]
+      },
+      {
+        "tStartMs": 256000,
+        "dDurationMs": 6000,
+        "segs": [
+          {
+            "utf8": "we will find the efficiency from the temperatures directly"
+          }
+        ]
+      },
+      {
+        "tStartMs": 268000,
+        "dDurationMs": 6000,
+        "segs": [
+          {
+            "utf8": "second question is about entropy change in mixing"
+          }
+        ]
+      },
+      {
+        "tStartMs": 281000,
+        "dDurationMs": 6000,
+        "segs": [
+          {
+            "utf8": "you have to integrate carefully here"
+          }
+        ]
+      },
+      {
+        "tStartMs": 294000,
+        "dDurationMs": 6000,
+        "segs": [
+          {
+            "utf8": "finally let's do a quick revision"
+          }
+        ]
+      },
+      {
+        "tStartMs": 303000,
+        "dDurationMs": 6000,
+        "segs": [
+          {
+            "utf8": "remember entropy always increases for an irreversible process"
+          }
+        ]
+      },
+      {
+        "tStartMs": 313000,
+        "dDurationMs": 6000,
+        "segs": [
+          {
+            "utf8": "and the carnot efficiency is the maximum possible"
+          }
+        ]
+      }
+    ]
+  },
+  "groundTruth": [
+    {
+      "startMs": 0,
+      "label": "Introduction"
+    },
+    {
+      "startMs": 30000,
+      "label": "Second Law of Thermodynamics"
+    },
+    {
+      "startMs": 75000,
+      "label": "Entropy"
+    },
+    {
+      "startMs": 112000,
+      "label": "Heat Engines"
+    },
+    {
+      "startMs": 160000,
+      "label": "Carnot Cycle"
+    },
+    {
+      "startMs": 199000,
+      "label": "Refrigerators and Heat Pumps"
+    },
+    {
+      "startMs": 233000,
+      "label": "Solved Examples"
+    },
+    {
+      "startMs": 294000,
+      "label": "Quick Revision"
+    }
+  ],
+  "transcript": [
+    {
+      "startMs": 0,
+      "text": "ok so in today's lecture we will finish the second law of thermodynamics"
+    },
+    {
+      "startMs": 6000,
+      "text": "we will start with the basics and slowly move to the carnot cycle"
+    },
+    {
+      "startMs": 13000,
+      "text": "before that a quick recap of the first law"
+    },
+    {
+      "startMs": 20000,
+      "text": "the first law is just energy conservation for a gas"
+    },
+    {
+      "startMs": 30000,
+      "text": "so now let's move on to the second law of thermodynamics"
+    },
+    {
+      "startMs": 38000,
+      "text": "the second law tells us the direction of heat flow"
+    },
+    {
+      "startMs": 46000,
+      "text": "heat always flows from a hotter body to a colder body"
+    },
+    {
+      "startMs": 55000,
+      "text": "kelvin planck and clausius statements are the two versions"
+    },
+    {
+      "startMs": 66000,
+      "text": "as we discussed earlier when we looked at heat engines this matters a lot"
+    },
+    {
+      "startMs": 75000,
+      "text": "next topic is entropy"
+    },
+    {
+      "startMs": 83000,
+      "text": "entropy is a measure of the disorder of the system"
+    },
+    {
+      "startMs": 92000,
+      "text": "the change in entropy is the integral of dq over t"
+    },
+    {
+      "startMs": 104000,
+      "text": "for a reversible process this is exact"
+    },
+    {
+      "startMs": 112000,
+      "text": "now let's look at heat engines"
+    },
+    {
+      "startMs": 120000,
+      "text": "a heat engine takes heat from a hot reservoir"
+    },
+    {
+      "startMs": 130000,
+      "text": "and converts part of it into work"
+    },
+    {
+      "startMs": 139000,
+      "text": "the efficiency is one minus q two by q one"
+    },
+    {
+      "startMs": 150000,
+      "text": "no engine can be one hundred percent efficient"
+    },
+    {
+      "startMs": 160000,
+      "text": "let's now discuss the carnot cycle"
+    },
+    {
+      "startMs": 169000,
+      "text": "the carnot cycle has four reversible processes"
+    },
+    {
+      "startMs": 178000,
+      "text": "two isothermal and two adiabatic"
+    },
+    {
+      "startMs": 188000,
+      "text": "the efficiency depends only on the two temperatures"
+    },
+    {
+      "startMs": 199000,
+      "text": "next we come to refrigerators and heat pumps"
+    },
+    {
+      "startMs": 209000,
+      "text": "a refrigerator is the reverse of a heat engine"
+    },
+    {
+      "startMs": 220000,
+      "text": "the coefficient of performance is the useful effect by the work input"
+    },
+    {
+      "startMs": 233000,
+      "text": "moving on to the solved examples now"
+    },
+    {
+      "startMs": 243000,
+      "text": "first question is a carnot engine operating between two temperatures"
+    },
+    {
+      "startMs": 256000,
+      "text": "we will find the efficiency from the temperatures directly"
+    },
+    {
+      "startMs": 268000,
+      "text": "second question is about entropy change in mixing"
+    },
+    {
+      "startMs": 281000,
+      "text": "you have to integrate carefully here"
+    },
+    {
+      "startMs": 294000,
+      "text": "finally let's do a quick revision"
+    },
+    {
+      "startMs": 303000,
+      "text": "remember entropy always increases for an irreversible process"
+    },
+    {
+      "startMs": 313000,
+      "text": "and the carnot efficiency is the maximum possible"
+    }
+  ]
+}

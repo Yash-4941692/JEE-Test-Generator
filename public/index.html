@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Chapter One — exact topic timestamps for YouTube lectures</title>
+    <meta
+      name="description"
+      content="Paste a YouTube lecture and get every topic with the exact second it starts. Verified timestamps from creator chapters, clearly-marked approximations when derived from the transcript."
+    />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%23111827'/%3E%3Ccircle cx='16' cy='16' r='9' fill='none' stroke='%2334d399' stroke-width='2.2'/%3E%3Cpath d='M16 10.5V16l4 2.5' stroke='%2334d399' stroke-width='2.2' stroke-linecap='round' fill='none'/%3E%3C/svg%3E"
+    />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="aura" aria-hidden="true"></div>
+
+    <main class="shell">
+      <header class="head">
+        <a class="brand" href="/">
+          <span class="mark" aria-hidden="true">
+            <svg viewBox="0 0 32 32" width="22" height="22">
+              <circle cx="16" cy="16" r="9" fill="none" stroke="currentColor" stroke-width="2.2" />
+              <path d="M16 10.5V16l4 2.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" fill="none" />
+            </svg>
+          </span>
+          <span class="brand-text">
+            <strong>Chapter One</strong>
+            <small>topic timestamps for YouTube</small>
+          </span>
+        </a>
+        <a class="ghost-link" href="#accuracy">How accurate?</a>
+      </header>
+
+      <section class="hero">
+        <h1>Every topic.<br /><span>The exact second it starts.</span></h1>
+        <p class="lede">
+          Paste a lecture. You get a topic list with real timestamps — pulled from the
+          creator's own chapters when they exist, and clearly marked as approximate when
+          they have to be derived from the transcript.
+        </p>
+      </section>
+
+      <form id="form" class="input-card" autocomplete="off">
+        <div class="input-row">
+          <span class="prefix" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round">
+              <rect x="2.5" y="5" width="19" height="14" rx="4" />
+              <path d="M10.5 9.5l4.5 2.5-4.5 2.5z" fill="currentColor" stroke="none" />
+            </svg>
+          </span>
+          <input
+            id="url"
+            name="url"
+            type="text"
+            spellcheck="false"
+            placeholder="https://www.youtube.com/watch?v=…"
+            aria-label="YouTube video link"
+          />
+          <button type="submit" id="go">
+            <span class="label">Find topics</span>
+            <span class="spinner" aria-hidden="true"></span>
+          </button>
+        </div>
+        <div class="hint-row">
+          <span class="hint"><kbd>Ctrl</kbd> + <kbd>Enter</kbd></span>
+          <span class="dot" aria-hidden="true"></span>
+          <span class="hint">Watch links, youtu.be, Shorts, or a bare video ID</span>
+          <span class="dot" aria-hidden="true"></span>
+          <button type="button" id="demo-toggle" class="text-btn demo-btn">Try offline samples</button>
+        </div>
+
+        <div id="samples" class="samples" hidden>
+          <p class="samples-note">
+            Stored samples run through the same pipeline as a live video — useful when this
+            server has no internet. One has creator chapters, one has none at all.
+          </p>
+          <div class="sample-grid" id="sample-grid"></div>
+        </div>
+      </form>
+
+      <div id="alert" class="alert" role="alert" hidden></div>
+      <section id="result" class="result" hidden aria-live="polite"></section>
+
+      <section id="accuracy" class="accuracy">
+        <h2>What the timestamps mean</h2>
+        <div class="tiers">
+          <article class="tier verified">
+            <div class="tier-head">
+              <span class="badge verified">Verified</span>
+              <span class="tier-sub">exact</span>
+            </div>
+            <p>
+              The timestamp is a chapter the creator defined, or a timestamped line they
+              wrote in the description. It is the same number YouTube jumps to — nothing
+              is inferred, and you can check any row against the video.
+            </p>
+          </article>
+          <article class="tier inferred">
+            <div class="tier-head">
+              <span class="badge inferred">Inferred</span>
+              <span class="tier-sub">approximate</span>
+            </div>
+            <p>
+              The video has no chapters, so topics are detected from how the speaker moves
+              between subjects. The time is where that sentence truly begins in the
+              captions; <em>which</em> sentences count as new topics is a judgment, so each
+              row carries a confidence score and the sentence it came from.
+            </p>
+          </article>
+          <article class="tier none">
+            <div class="tier-head">
+              <span class="badge none">Unavailable</span>
+              <span class="tier-sub">nothing claimed</span>
+            </div>
+            <p>
+              No chapters and no usable captions. Rather than invent times, it says so.
+              That refusal is the point — a made-up timestamp is worse than none.
+            </p>
+          </article>
+        </div>
+        <p class="accuracy-foot">
+          There is no "99.99% accurate" claim here, because topic boundaries are not a
+          ground-truth problem. What is exact is stated as exact; what is judgment is
+          labelled as judgment. Measured numbers for the transcript detector are produced
+          by <code>npm run evaluate</code> against a hand-labelled fixture.
+        </p>
+      </section>
+
+      <footer class="foot">
+        <span>Runs on your own server. No accounts, no storage of the videos you look up.</span>
+      </footer>
+    </main>
+
+    <script src="/app.js"></script>
+  </body>
+</html>
