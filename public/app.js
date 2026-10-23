@@ -62,7 +62,20 @@ function showAlert(message, options = {}) {
   const kind = options.kind || 'error';
 
   alertBox.replaceChildren(el('span', { text: message }));
-  if (typeof options.retry === 'function') {
+  if (typeof options.action === 'function') {
+    alertBox.append(
+      el('button', {
+        class: 'alert-retry',
+        type: 'button',
+        text: options.actionLabel || 'Continue',
+        onclick: () => {
+          const action = options.action;
+          clearAlert();
+          action();
+        },
+      })
+    );
+  } else if (typeof options.retry === 'function') {
     alertBox.append(
       el('button', {
         class: 'alert-retry',
@@ -180,18 +193,35 @@ function describeFailure(res, data, text) {
   if (data && data.error) {
     const code = data.code;
     let message = data.error;
+    let action = null;
+    let actionLabel = null;
 
     if (code === 'FETCH_FAILED' || code === 'PAGE_UNREADABLE') {
-      message +=
-        ' YouTube may be unreachable from this server — a hosted preview often has no outbound internet. The offline samples still work.';
+      message =
+        'This server could not reach YouTube, so the link could not be read. ' +
+        'A hosted preview usually has no outbound internet — the app itself is working. ' +
+        'Try an offline sample to see it in action, or run it on a host with internet access.';
+      action = () => openSamples();
+      actionLabel = 'Open offline samples';
     }
     if (code === 'TIMEOUT') {
       message += ' The request was stopped early so it would not hang.';
     }
+    if (code === 'VIDEO_UNAVAILABLE') {
+      message += ' Check the link opens in a browser without signing in.';
+    }
+    if (code === 'UPSTREAM_RATE_LIMITED') {
+      message += ' Wait a minute before trying again.';
+    }
+
     return {
       message,
       kind: code === 'RATE_LIMITED' ? 'soft' : 'error',
-      retryable: code !== 'RATE_LIMITED',
+      // The server says whether retrying can help; a deterministic failure
+      // (no internet, private video) must not be retried in a loop.
+      retryable: typeof data.retryable === 'boolean' ? data.retryable : code !== 'RATE_LIMITED',
+      action,
+      actionLabel,
     };
   }
 
@@ -283,6 +313,8 @@ checkHealth();
       // message — gateways hiccup, and waiting in silence looks like a hang.
       showAlert(failure.message, {
         kind: failure.kind,
+        action: failure.action,
+        actionLabel: failure.actionLabel,
         retry: failure.retryable ? () => run(raw, { sample }) : undefined,
       });
 
@@ -583,6 +615,12 @@ function slug(text) {
 /* ------------------------------------------------------------------ *
  * samples
  * ------------------------------------------------------------------ */
+function openSamples() {
+  samplesPanel.hidden = false;
+  if (!sampleGrid.childElementCount) loadSamples();
+  samplesPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
 demoToggle.addEventListener('click', () => {
   samplesPanel.hidden = !samplesPanel.hidden;
   if (!samplesPanel.hidden && !sampleGrid.childElementCount) loadSamples();

@@ -13,7 +13,7 @@ serves the UI and does the work.
 
 ```bash
 npm start        # http://localhost:3000
-npm test         # 94 tests
+npm test         # 96 tests
 npm run evaluate # measured accuracy on the labelled fixture
 ```
 
@@ -150,9 +150,23 @@ curl -X POST http://localhost:3000/api/topics \
 ```
 
 Other endpoints: `GET /api/health`, `GET /api/samples`, `POST /api/samples/:key`.
-Errors return `{ "ok": false, "error": "...", "code": "..." }` with codes
+Errors return `{ "ok": false, "error": "...", "code": "...", "retryable": false }` with codes
 `EMPTY_INPUT`, `INVALID_URL`, `NOT_YOUTUBE`, `VIDEO_UNAVAILABLE`, `UPSTREAM_RATE_LIMITED`,
 `TIMEOUT`, `FETCH_FAILED`, `PAGE_UNREADABLE`, `RATE_LIMITED`.
+
+**Status codes are deliberately split by cause:**
+
+| Cause | HTTP status |
+| --- | --- |
+| Malformed input (`EMPTY_INPUT`, `INVALID_URL`, `NOT_YOUTUBE`) | `422` |
+| Too many requests (`RATE_LIMITED`) | `429` |
+| **Upstream/domain failure** (YouTube unreachable, timeout, video unavailable) | **`200` with `ok: false`** |
+
+The last row is not a mistake. Proxies and preview gateways intercept `5xx` responses and
+substitute their own HTML error page, which destroys the actual diagnosis — this app used
+to return `502` and users saw only an unexplained "gateway returned 502". A `200` with
+`ok: false` cannot be rewritten, so check `ok` rather than the status code. Input errors
+keep their `4xx` because proxies leave those alone.
 
 Input accepts `watch?v=`, `youtu.be`, `/shorts/`, `/embed/`, `/live/`, `music.youtube.com`,
 a scheme-less URL, or a bare 11-character video ID.
@@ -199,10 +213,16 @@ you at the offline samples.
 
 ## Troubleshooting
 
-**"The gateway returned HTTP 502" / a bare `HTTP 502`.**
-That is not the app failing — it is whatever sits in front of it (a preview proxy,
-load balancer, reverse proxy) giving up and sending its own error page instead of the
-app's JSON. The app now says so explicitly and offers **Retry**, instead of echoing a
+**"This server could not reach YouTube" / a bare `HTTP 502`.**
+These are two different things:
+
+- *"could not reach YouTube"* — the app answered correctly; the host has no internet
+  egress (normal for a sandboxed preview). The message includes a button that opens the
+  offline samples.
+- *a bare `HTTP 502`* — a proxy in front of the app replaced the response. The app no
+  longer triggers this for upstream failures, because those now return `200` with
+  `ok: false` (see the API section). If you still see it, the request never got a usable
+  reply from the app itself. The app now says so explicitly and offers **Retry**, instead of echoing a
 status code. Two things make this diagnosable:
 
 - Every API request is logged with its status and duration:

@@ -64,17 +64,33 @@ function sendJson(res, status, payload) {
   res.end(body);
 }
 
+/**
+ * Status codes for /api/topics.
+ *
+ * Deliberately conservative: only a malformed request gets a 4xx, and an
+ * *upstream* failure gets HTTP 200 with `ok: false` in the body.
+ *
+ * Reason: gateways and preview proxies intercept 5xx responses and substitute
+ * their own HTML error page. A 502 from this app therefore reached the browser
+ * as an unexplained "502 from the gateway" instead of our actual diagnosis. A
+ * 200 with `ok: false` cannot be rewritten, so the real message survives.
+ * 4xx codes are left alone by proxies, so input errors keep their status.
+ */
 const STATUS_FOR_CODE = {
   EMPTY_INPUT: 422,
+  INVALID_INPUT: 422,
   INVALID_URL: 422,
   NOT_YOUTUBE: 422,
-  VIDEO_UNAVAILABLE: 404,
-  UPSTREAM_RATE_LIMITED: 429,
-  TIMEOUT: 504,
-  FETCH_FAILED: 502,
-  PAGE_UNREADABLE: 502,
   RATE_LIMITED: 429,
+  // Everything below is an upstream/domain failure -> reported with HTTP 200.
+  VIDEO_UNAVAILABLE: 200,
+  UPSTREAM_RATE_LIMITED: 200,
+  TIMEOUT: 200,
+  FETCH_FAILED: 200,
+  PAGE_UNREADABLE: 200,
 };
+
+const TRANSIENT_CODES = new Set([null, undefined, 'INTERNAL', 'TIMEOUT', 'UPSTREAM_RATE_LIMITED']);
 
 function readBody(req, limit = 8 * 1024) {
   return new Promise((resolve, reject) => {
@@ -194,7 +210,7 @@ async function route(req, res, pathname) {
     } catch (err) {
       if (err instanceof BudgetExceeded) {
         log('budget exceeded after', err.budgetMs + 'ms');
-        return sendJson(res, 504, {
+        return sendJson(res, 200, {
           ok: false,
           error: 'YouTube took too long to answer, so the lookup was stopped before the request timed out. Try again, or use the offline samples.',
           code: 'TIMEOUT',
@@ -204,10 +220,12 @@ async function route(req, res, pathname) {
       const known = err instanceof YouTubeError;
       const status = known ? STATUS_FOR_CODE[err.code] || 500 : 500;
       if (!known) log('unexpected analysis error:', err && (err.stack || err.message));
+      const code = known ? err.code : 'INTERNAL';
       return sendJson(res, status, {
         ok: false,
         error: known ? err.message : 'Something went wrong while reading that video.',
-        code: known ? err.code : 'INTERNAL',
+        code,
+        retryable: TRANSIENT_CODES.has(code),
         ...(known && err.details && Object.keys(err.details).length ? { details: err.details } : {}),
       });
     }

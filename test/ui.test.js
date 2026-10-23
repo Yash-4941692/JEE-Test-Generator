@@ -254,19 +254,54 @@ test('sample buttons load and are labelled as samples', async () => {
   window.close();
 });
 
-test('errors surface as alerts, including the offline-server hint', async () => {
+test('an unreachable upstream offers a one-click route to the samples', async () => {
   const { window, doc } = boot({
-    respond: async () => ({
-      ok: false,
-      status: 502,
-      json: async () => ({ ok: false, error: "Couldn't reach YouTube (ENOTFOUND).", code: 'FETCH_FAILED' }),
-    }),
+    respond: async (url) => {
+      if (String(url).includes('/api/samples')) {
+        return { ok: true, status: 200, json: async () => ({ ok: true, samples: [{ key: 'verified', name: 'Circular Motion', blurb: 'b' }] }) };
+      }
+      return {
+        ok: true,
+        status: 200,
+        text: async () => JSON.stringify({ ok: false, error: 'x', code: 'FETCH_FAILED', retryable: false }),
+      };
+    },
   });
 
   await submit(doc, window, 'https://youtu.be/fixtureVer1');
-  const alertText = doc.querySelector('#alert').textContent;
-  assert.match(alertText, /Couldn't reach YouTube/);
-  assert.match(alertText, /offline samples/);
+
+  const alertBox = doc.querySelector('#alert');
+  assert.match(alertBox.textContent, /could not reach YouTube/);
+  assert.match(alertBox.textContent, /app itself is working/);
+
+  const action = alertBox.querySelector('.alert-retry');
+  assert.equal(action.textContent, 'Open offline samples');
+
+  action.dispatchEvent(new window.Event('click', { bubbles: true }));
+  await settle();
+  assert.equal(doc.querySelector('#samples').hidden, false, 'the samples panel opens');
+  assert.ok(doc.querySelector('.sample-btn'), 'and the samples are listed');
+  window.close();
+});
+
+test('a deterministic failure is not retried in a loop', async () => {
+  let calls = 0;
+  const { window, doc } = boot({
+    respond: async () => {
+      calls += 1;
+      return {
+        ok: true,
+        status: 200,
+        text: async () => JSON.stringify({ ok: false, error: 'x', code: 'FETCH_FAILED', retryable: false }),
+      };
+    },
+  });
+
+  await submit(doc, window, 'https://youtu.be/fixtureVer1');
+  await new Promise((r) => setTimeout(r, 800)); // longer than the retry delay
+  await settle();
+
+  assert.equal(calls, 1, 'no automatic retry when the server says it will not help');
   assert.equal(doc.querySelector('#result').hidden, true);
   window.close();
 });

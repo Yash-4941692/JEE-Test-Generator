@@ -136,6 +136,20 @@ test('rejects malformed bodies and wrong methods', async () => {
   assert.equal(wrong.status, 405);
 });
 
+test('upstream failures use HTTP 200 so a gateway cannot rewrite them', async () => {
+  // This sandbox has no internet, so a real YouTube fetch fails — exactly the
+  // case that used to reach the browser as a proxy's own 502 page.
+  const res = await post('/api/topics', { url: 'https://youtu.be/dQw4w9WgXcQ' });
+  const json = await res.json();
+
+  assert.equal(res.status, 200, 'upstream failure must not use a 5xx status');
+  assert.equal(json.ok, false);
+  assert.equal(typeof json.error, 'string');
+  assert.ok(json.error.length > 10);
+  assert.ok(['FETCH_FAILED', 'TIMEOUT', 'PAGE_UNREADABLE', 'VIDEO_UNAVAILABLE'].includes(json.code));
+  assert.equal(json.retryable, false, 'a deterministic failure is not advertised as retryable');
+});
+
 test('404s for unknown pages and endpoints', async () => {
   assert.equal((await fetch(BASE + '/nope')).status, 404);
   assert.equal((await post('/api/unknown')).status, 404);
