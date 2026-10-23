@@ -4,7 +4,10 @@ const http = require('node:http');
 const fs = require('node:fs');
 const fsp = require('node:fs/promises');
 const path = require('node:path');
-const { resolve, ResolveError } = require('./src/resolver');
+
+const { analyse } = require('./src/topics');
+const { YouTubeError } = require('./src/youtube');
+const { runSample, listSamples } = require('./src/demo');
 
 const PORT = Number(process.env.PORT) || 3000;
 const HOST = process.env.HOST || '0.0.0.0';
@@ -17,13 +20,12 @@ const MIME = {
   '.json': 'application/json; charset=utf-8',
   '.svg': 'image/svg+xml',
   '.png': 'image/png',
-  '.ico': 'image/x-icon',
-  '.woff2': 'font/woff2',
+  '.webmanifest': 'application/manifest+json',
 };
 
-/* --- tiny in-memory rate limit (per IP) ---------------------------------- */
+/* --- rate limit ---------------------------------------------------------- */
 const WINDOW_MS = 60_000;
-const MAX_PER_WINDOW = 40;
+const MAX_PER_WINDOW = 25;
 const hits = new Map();
 
 function rateLimited(ip) {
@@ -42,7 +44,7 @@ setInterval(() => {
   for (const [ip, e] of hits) if (now - e.start > WINDOW_MS * 2) hits.delete(ip);
 }, 60_000).unref();
 
-/* --- helpers ------------------------------------------------------------ */
+/* --- helpers ------------------------------------------------------------- */
 function sendJson(res, status, payload) {
   const body = JSON.stringify(payload);
   res.writeHead(status, {
@@ -53,20 +55,32 @@ function sendJson(res, status, payload) {
   res.end(body);
 }
 
-function readBody(req, limit = 16 * 1024) {
-  return new Promise((resolvePromise, reject) => {
+const STATUS_FOR_CODE = {
+  EMPTY_INPUT: 422,
+  INVALID_URL: 422,
+  NOT_YOUTUBE: 422,
+  VIDEO_UNAVAILABLE: 404,
+  UPSTREAM_RATE_LIMITED: 429,
+  TIMEOUT: 504,
+  FETCH_FAILED: 502,
+  PAGE_UNREADABLE: 502,
+  RATE_LIMITED: 429,
+};
+
+function readBody(req, limit = 8 * 1024) {
+  return new Promise((resolve, reject) => {
     let size = 0;
     const chunks = [];
     req.on('data', (c) => {
       size += c.length;
       if (size > limit) {
-        reject(new ResolveError('That request was too large.', 'BODY_TOO_LARGE'));
+        reject(new YouTubeError('That request was too large.', 'INVALID_URL'));
         req.destroy();
         return;
       }
       chunks.push(c);
     });
-    req.on('end', () => resolvePromise(Buffer.concat(chunks).toString('utf8')));
+    req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
     req.on('error', reject);
   });
 }
@@ -75,7 +89,6 @@ async function serveStatic(req, res, pathname) {
   const rel = pathname === '/' ? 'index.html' : pathname.replace(/^\/+/, '');
   const filePath = path.join(PUBLIC_DIR, rel);
 
-  // Never serve outside public/
   if (!filePath.startsWith(PUBLIC_DIR + path.sep) && filePath !== PUBLIC_DIR) {
     res.writeHead(403).end('Forbidden');
     return;
@@ -97,50 +110,7 @@ async function serveStatic(req, res, pathname) {
   }
 }
 
-/* --- demo chain ---------------------------------------------------------- *
- * A real redirect chain served by this app, used by the "Try a demo" button.
- * It exists so the UI can be exercised even where the host has no outbound
- * internet (sandboxed previews, locked-down networks).
- * ------------------------------------------------------------------------- */
-const DEMO_ROUTES = {
-  '/demo/start': (res) => {
-    res.writeHead(302, { location: '/demo/interstitial', 'content-type': 'text/html' });
-    res.end('<html><body>moved</body></html>');
-  },
-  '/demo/interstitial': (res) => {
-    res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
-    res.end(
-      '<!doctype html><html><head><title>Please wait…</title>' +
-        '<meta http-equiv="refresh" content="2; url=/demo/continue"></head>' +
-        '<body><p>Preparing your link…</p></body></html>'
-    );
-  },
-  '/demo/continue': (res) => {
-    res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
-    res.end(
-      '<!doctype html><html><head><title>Continue</title></head><body>' +
-        "<script>window.location.replace('/demo/destination');</script>" +
-        '<a href="/demo/destination">Continue</a></body></html>'
-    );
-  },
-  '/demo/destination': (res) => {
-    res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
-    res.end(
-      '<!doctype html><html><head><title>JEE Main 2025 — Sample Question Paper</title></head>' +
-        '<body><h1>JEE Main 2025 — Sample Question Paper</h1>' +
-        '<p>This is the end of the demo chain.</p></body></html>'
-    );
-  },
-};
-
-function handleDemo(req, res, pathname) {
-  const route = DEMO_ROUTES[pathname];
-  if (!route) return false;
-  route(res);
-  return true;
-}
-
-/* --- server ------------------------------------------------------------- */
+/* --- server -------------------------------------------------------------- */
 const server = http.createServer(async (req, res) => {
   let pathname = '/';
   try {
@@ -150,52 +120,38 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  if (pathname.startsWith('/demo/')) {
-    if (handleDemo(req, res, pathname)) return;
-    res.writeHead(404).end('Unknown demo step');
-    return;
-  }
-
   if (pathname === '/api/health') {
     return sendJson(res, 200, { ok: true, uptime: Math.round(process.uptime()) });
   }
 
-  // Runs the full resolver against this app's own demo chain. URLs are
-  // returned as relative paths so they open through the preview, not the
-  // viewer's own localhost.
-  if (pathname === '/api/demo') {
-    const origin = `http://127.0.0.1:${PORT}`;
-    const rel = (u) => (typeof u === 'string' ? u.replace(origin, '') || '/' : u);
+  if (pathname === '/api/samples' && req.method === 'GET') {
+    return sendJson(res, 200, { ok: true, samples: listSamples() });
+  }
+
+  if (pathname.startsWith('/api/samples/') && req.method === 'POST') {
+    const key = pathname.split('/').pop();
     try {
-      const result = await resolve(`${origin}/demo/start`, { allowPrivateHosts: true });
-      return sendJson(res, 200, {
-        ...result,
-        demo: true,
-        input: 'demo chain',
-        entryUrl: rel(result.entryUrl),
-        finalUrl: rel(result.finalUrl),
-        finalHost: 'this app (demo)',
-        hops: result.hops.map((h) => ({ ...h, url: rel(h.url), next: rel(h.next) })),
-        anchors: result.anchors.map((a) => ({ ...a, url: rel(a.url) })),
-      });
+      const report = await runSample(key);
+      if (!report) return sendJson(res, 404, { ok: false, error: 'Unknown sample.', code: 'NOT_FOUND' });
+      return sendJson(res, 200, report);
     } catch (err) {
       return sendJson(res, 500, {
         ok: false,
-        error: 'The demo chain failed to run.',
-        code: 'DEMO_FAILED',
+        error: 'That sample failed to run.',
+        code: 'SAMPLE_FAILED',
+        detail: String(err && err.message),
       });
     }
   }
 
-  if (pathname === '/api/resolve') {
+  if (pathname === '/api/topics') {
     if (req.method === 'OPTIONS') {
       res.writeHead(204, {
         'access-control-allow-origin': '*',
         'access-control-allow-methods': 'POST, OPTIONS',
         'access-control-allow-headers': 'content-type',
       });
-      res.end();
-      return;
+      return res.end();
     }
     if (req.method !== 'POST') {
       return sendJson(res, 405, { ok: false, error: 'Use POST.' });
@@ -205,27 +161,33 @@ const server = http.createServer(async (req, res) => {
     if (rateLimited(ip)) {
       return sendJson(res, 429, {
         ok: false,
-        error: 'Too many lookups in a row. Give it a minute.',
+        error: 'Too many videos in a row. Give it a minute.',
         code: 'RATE_LIMITED',
       });
     }
 
+    let payload = {};
     try {
       const raw = await readBody(req);
-      let payload = {};
-      try {
-        payload = raw ? JSON.parse(raw) : {};
-      } catch {
-        return sendJson(res, 400, { ok: false, error: 'Send JSON: { "url": "..." }' });
-      }
-      const result = await resolve(payload.url ?? '', {});
-      return sendJson(res, 200, result);
+      payload = raw ? JSON.parse(raw) : {};
     } catch (err) {
-      const known = err instanceof ResolveError;
-      return sendJson(res, known ? 422 : 500, {
+      if (err instanceof YouTubeError) {
+        return sendJson(res, 413, { ok: false, error: err.message, code: err.code });
+      }
+      return sendJson(res, 400, { ok: false, error: 'Send JSON: { "url": "..." }', code: 'BAD_JSON' });
+    }
+
+    try {
+      const report = await analyse(payload.url ?? '', {});
+      return sendJson(res, 200, report);
+    } catch (err) {
+      const known = err instanceof YouTubeError;
+      const status = known ? STATUS_FOR_CODE[err.code] || 500 : 500;
+      return sendJson(res, status, {
         ok: false,
-        error: known ? err.message : 'Something went wrong while resolving that link.',
+        error: known ? err.message : 'Something went wrong while reading that video.',
         code: known ? err.code : 'INTERNAL',
+        ...(known && err.details && Object.keys(err.details).length ? { details: err.details } : {}),
       });
     }
   }
@@ -243,7 +205,7 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, HOST, () => {
-  console.log(`Link Inspector running on http://${HOST}:${PORT}`);
+  console.log(`Topic Timestamps running on http://${HOST}:${PORT}`);
 });
 
 process.on('SIGTERM', () => server.close(() => process.exit(0)));

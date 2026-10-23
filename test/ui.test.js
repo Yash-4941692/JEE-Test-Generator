@@ -1,9 +1,6 @@
 'use strict';
 
-/**
- * UI smoke test: loads the real index.html + app.js into jsdom, stubs fetch,
- * and checks what actually renders.
- */
+/** UI tests: the real index.html + app.js executed in jsdom with stubbed fetch. */
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -27,230 +24,270 @@ function boot({ respond }) {
     pretendToBeVisual: true,
   });
 
-  // jsdom lacks these; the UI calls them.
-  dom.window.HTMLElement.prototype.scrollIntoView = function () {};
-  dom.window.localStorage.clear();
-  dom.window.fetch = async (url, init) => respond(url, init ? JSON.parse(init.body) : null);
-  dom.window.navigator.clipboard = { writeText: async () => {} };
+  const w = dom.window;
+  w.HTMLElement.prototype.scrollIntoView = function () {};
+  w.localStorage.clear();
+  w.fetch = async (url, init) => respond(String(url), init);
+  w.navigator.clipboard = { writeText: async () => {} };
+  w.eval(appJs);
 
-  dom.window.eval(appJs);
-  return { dom, window: dom.window, doc: dom.window.document, errors };
+  return { window: w, doc: w.document, errors };
 }
 
-const DEMO = {
-  ok: true,
-  demo: true,
-  input: 'demo chain',
-  entryUrl: '/demo/start',
-  finalUrl: '/demo/destination',
-  finalHost: 'this app (demo)',
-  finalStatus: 200,
-  finalTitle: 'JEE Main 2025 — Sample Question Paper',
-  finalContentType: 'text/html; charset=utf-8',
-  finalFileType: 'Web page',
-  hops: [
-    { url: '/demo/start', status: 302, kind: 'http-redirect', note: 'HTTP 302', next: '/demo/interstitial' },
-    { url: '/demo/interstitial', status: 200, kind: 'meta-refresh', note: 'Meta refresh', next: '/demo/continue' },
-    { url: '/demo/continue', status: 200, kind: 'js-redirect', note: 'JavaScript redirect', next: '/demo/destination' },
-  ],
-  hopCount: 3,
-  blocked: null,
-  warnings: [],
-  anchors: [],
-  embedded: [],
-  elapsedMs: 58,
-};
-
-const REAL = {
-  ok: true,
-  demo: false,
-  input: 'https://vplink.in/snB67M',
-  entryUrl: 'https://vplink.in/snB67M',
-  finalUrl: 'https://drive.example.com/file/d/abc123/view?usp=sharing',
-  finalHost: 'drive.example.com',
-  finalStatus: 200,
-  finalTitle: 'JEE Main 2025 Question Paper',
-  finalContentType: 'text/html; charset=utf-8',
-  finalFileType: 'Web page',
-  hops: [
-    {
-      url: 'https://vplink.in/snB67M',
-      status: 302,
-      kind: 'http-redirect',
-      note: 'HTTP 302',
-      next: 'https://arolinks.com/short/K2x9',
-    },
-    {
-      url: 'https://arolinks.com/short/K2x9',
-      status: 200,
-      kind: 'meta-refresh',
-      note: 'Meta refresh',
-      next: 'https://drive.example.com/file/d/abc123/view?usp=sharing',
-    },
-  ],
-  hopCount: 2,
-  blocked: null,
-  warnings: [],
-  anchors: [
-    { url: 'https://example.com/paper.pdf', label: 'Download question paper', host: 'example.com' },
-  ],
-  embedded: [],
-  elapsedMs: 412,
-};
+const ok = (payload) => async () => ({ ok: true, status: 200, json: async () => payload });
 
 const tick = () => new Promise((r) => setTimeout(r, 0));
+async function settle() {
+  for (let i = 0; i < 6; i++) await tick();
+}
+
+const VERIFIED = {
+  ok: true,
+  video: {
+    id: 'fixtureVer1',
+    url: 'https://www.youtube.com/watch?v=fixtureVer1',
+    title: 'Circular Motion — Complete One Shot',
+    channel: 'Physics Wallah Foundation',
+    durationMs: 1625000,
+    durationLabel: '27:05',
+    thumbnail: 'https://i.ytimg.com/vi/fixtureVer1/hqdefault.jpg',
+  },
+  accuracy: {
+    tier: 'verified',
+    method: 'youtube-chapters',
+    statement: 'Every timestamp is a creator-defined chapter.',
+  },
+  sources: {
+    youtubeChapters: { available: true, count: 10 },
+    descriptionTimestamps: { available: true, count: 10, confidence: 1, reason: 'ok' },
+    captions: { available: true, used: 'English', isAsr: true, language: 'en', trackCount: 1, cueCount: 11 },
+  },
+  topics: [
+    { index: 1, startMs: 0, label: 'Introduction to Circular Motion', tier: 'verified', confidence: 1, method: 'youtube-chapters', evidence: 'x' },
+    { index: 2, startMs: 95000, label: 'Angular Displacement and Angular Velocity', tier: 'verified', confidence: 1, method: 'youtube-chapters', evidence: 'x' },
+    { index: 3, startMs: 430000, label: 'Centripetal Acceleration Derivation', tier: 'verified', confidence: 1, method: 'youtube-chapters', evidence: 'x' },
+  ],
+  topicCount: 3,
+  warnings: [],
+  elapsedMs: 640,
+};
+
+const INFERRED = {
+  ok: true,
+  video: {
+    id: 'fixtureInf1',
+    url: 'https://www.youtube.com/watch?v=fixtureInf1',
+    title: 'Second Law of Thermodynamics',
+    channel: 'Physics Galaxy',
+    durationMs: 322000,
+    durationLabel: '5:22',
+    thumbnail: 'https://i.ytimg.com/vi/fixtureInf1/hqdefault.jpg',
+  },
+  accuracy: {
+    tier: 'inferred',
+    method: 'transcript-cue',
+    statement: 'Timestamps mark exactly where the detected transition sentence starts.',
+  },
+  sources: {
+    youtubeChapters: { available: false, count: 0 },
+    descriptionTimestamps: { available: false, count: 0, confidence: 0, reason: 'none' },
+    captions: { available: true, used: 'English (auto-generated)', isAsr: true, language: 'en', trackCount: 1, cueCount: 33 },
+  },
+  topics: [
+    { index: 1, startMs: 0, label: 'Introduction', tier: 'inferred', confidence: 0.57, method: 'transcript-cue', evidence: 'ok so in today\u2019s lecture we will finish the second law' },
+    { index: 2, startMs: 75000, label: 'Entropy', tier: 'inferred', confidence: 0.75, method: 'transcript-cue', evidence: 'next topic is entropy entropy is a measure of the disorder' },
+  ],
+  topicCount: 2,
+  warnings: ['This video has no chapters, so these topics were detected from transitions.'],
+  elapsedMs: 880,
+};
+
+const EMULATE = {
+  ok: true,
+  video: { ...VERIFIED.video, title: 'Private-ish video' },
+  accuracy: { tier: 'none', method: 'none', statement: 'No chapter data or usable captions were available, so no timestamps are being claimed.' },
+  sources: {
+    youtubeChapters: { available: false, count: 0 },
+    descriptionTimestamps: { available: false, count: 0, confidence: 0, reason: 'none' },
+    captions: { available: false, used: null, isAsr: false, language: '', trackCount: 0, cueCount: 0 },
+  },
+  topics: [],
+  topicCount: 0,
+  warnings: ['This video has no chapters and no captions, so there is no evidence to derive topics from.'],
+  elapsedMs: 500,
+};
+
 async function submit(doc, window, value) {
   doc.querySelector('#url').value = value;
   doc.querySelector('#form').dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
-  await tick();
-  await tick();
-  await tick();
+  await settle();
 }
 
-test('page boots without script errors and starts empty', () => {
-  const { doc, errors, window } = boot({ respond: async () => ({ ok: true, json: async () => REAL }) });
-  assert.equal(errors.length, 0);
+test('boots cleanly with an empty state', () => {
+  const { doc, errors, window } = boot({ respond: ok(VERIFIED) });
+  assert.deepEqual(errors, []);
   assert.equal(doc.querySelector('#result').hidden, true);
-  assert.equal(doc.querySelector('#history-wrap').hidden, true);
-  assert.equal(doc.querySelector('#demo').textContent, 'Try a demo chain');
+  assert.equal(doc.querySelector('#alert').hidden, true);
+  assert.equal(doc.querySelectorAll('.tier').length, 3, 'accuracy tiers are explained up front');
   window.close();
 });
 
-test('demo chain renders every hop exactly once, with the destination last', async () => {
-  const { window, doc } = boot({ respond: async () => ({ ok: true, json: async () => DEMO }) });
+test('verified result shows exact times, links that jump to the second, and no confidence bar', async () => {
+  const { window, doc } = boot({ respond: ok(VERIFIED) });
+  await submit(doc, window, 'https://youtu.be/fixtureVer1');
 
-  doc.querySelector('#demo').dispatchEvent(new window.Event('click', { bubbles: true }));
-  await tick();
-  await tick();
-  await tick();
+  assert.equal(doc.querySelector('#result').hidden, false);
+  assert.match(doc.querySelector('.banner').textContent, /Verified/);
+  assert.match(doc.querySelector('.banner').textContent, /creator-defined chapter/);
 
-  const result = doc.querySelector('#result');
-  assert.equal(result.hidden, false);
-  assert.match(result.textContent, /Demo chain/);
-  assert.equal(doc.querySelector('.final-url').textContent, '/demo/destination');
+  const times = [...doc.querySelectorAll('.topic-time')];
+  assert.deepEqual(times.map((t) => t.textContent.trim()), ['0:00', '1:35', '7:10']);
+  assert.equal(times[1].getAttribute('href'), 'https://www.youtube.com/watch?v=fixtureVer1&t=95s');
+  assert.equal(times[1].getAttribute('target'), '_blank');
 
-  const hops = [...doc.querySelectorAll('.hop-url')].map((n) => n.textContent);
-  assert.deepEqual(hops, [
-    '/demo/start',
-    '/demo/interstitial',
-    '/demo/continue',
-    '/demo/destination',
-  ]);
+  assert.equal(doc.querySelectorAll('.conf').length, 0, 'no confidence shown for exact data');
+  assert.equal(doc.querySelectorAll('details.why').length, 0, 'no evidence toggle for exact data');
 
-  // destination row is flagged final and tagged once
-  const last = doc.querySelector('.hop.final');
-  assert.match(last.textContent, /Destination/);
-  assert.doesNotMatch(last.textContent, /JavaScript redirect/,
-    'generic note must not repeat the kind label');
-  const urlRows = [...doc.querySelectorAll('.hop-url')].filter(
-    (n) => n.textContent === '/demo/destination'
-  );
-  assert.equal(urlRows.length, 1, 'destination must not appear twice');
-
-  // demo runs are not pushed into history
-  assert.equal(doc.querySelector('#history-wrap').hidden, true);
+  assert.match(doc.querySelector('.sources').textContent, /Chapters: 10/);
+  assert.match(doc.querySelector('.topic-list').textContent, /Angular Displacement/);
   window.close();
 });
 
-test('a real link shows the destination, copy button and chain', async () => {
-  const { window, doc } = boot({ respond: async () => ({ ok: true, json: async () => REAL }) });
+test('inferred result is clearly approximate, with confidence and the source sentence', async () => {
+  const { window, doc } = boot({ respond: ok(INFERRED) });
+  await submit(doc, window, 'https://www.youtube.com/watch?v=fixtureInf1');
 
-  await submit(doc, window, 'https://vplink.in/snB67M');
+  const banner = doc.querySelector('.banner').textContent;
+  assert.match(banner, /Inferred/);
+  assert.match(banner, /approximate/i);
+  assert.doesNotMatch(banner, /^Verified/);
 
-  assert.equal(doc.querySelector('.final-url').textContent, REAL.finalUrl);
-  assert.match(doc.querySelector('.result-top').textContent, /Resolved/);
-  assert.match(doc.querySelector('.result-top').textContent, /2 redirects/);
+  // times carry the ≈ marker
+  const times = [...doc.querySelectorAll('.topic-time')].map((t) => t.textContent);
+  assert.ok(times.every((t) => t.includes('≈')), 'approximate times are marked');
 
-  // open + copy actions exist and point at the destination
-  const open = doc.querySelector('a.btn.primary');
-  assert.equal(open.getAttribute('href'), REAL.finalUrl);
-  assert.equal(open.getAttribute('target'), '_blank');
-  assert.match(open.textContent, /Open destination/);
+  const confs = [...doc.querySelectorAll('.conf-text')].map((c) => c.textContent);
+  assert.deepEqual(confs, ['57% confident', '75% confident']);
 
-  // facts
-  const text = doc.querySelector('.facts').textContent;
-  assert.match(text, /drive\.example\.com/);
-  assert.match(text, /JEE Main 2025 Question Paper/);
+  const evidence = [...doc.querySelectorAll('.evidence')].map((e) => e.textContent);
+  assert.match(evidence[1], /next topic is entropy/);
 
-  // chain: start -> hop -> destination
-  const hops = [...doc.querySelectorAll('.hop-url')].map((n) => n.textContent);
-  assert.equal(hops.length, 3);
-  assert.equal(hops[2], REAL.finalUrl);
-
-  // anchors found on the page are offered
-  assert.match(doc.querySelector('.anchors').textContent, /Download question paper/);
-
-  // and it lands in history
-  assert.equal(doc.querySelector('#history-wrap').hidden, false);
-  assert.match(doc.querySelector('#history').textContent, /vplink\.in/);
+  assert.match(doc.querySelector('.warn-box').textContent, /no chapters/i);
   window.close();
 });
 
-test('copy button copies the final URL without clobbering its own label', async () => {
+test('a video with no sources claims nothing', async () => {
+  const { window, doc } = boot({ respond: ok(EMULATE) });
+  await submit(doc, window, 'https://youtu.be/fixtureVer1');
+
+  assert.match(doc.querySelector('.banner').textContent, /Unavailable/);
+  assert.equal(doc.querySelectorAll('.topic').length, 0);
+  assert.match(doc.querySelector('.empty-state').textContent, /No topics could be derived/);
+  assert.match(doc.querySelector('.empty-state').textContent, /rather than guessing/);
+  window.close();
+});
+
+test('copy list produces timestamped lines', async () => {
   let copied = null;
-  const { window, doc } = boot({ respond: async () => ({ ok: true, json: async () => REAL }) });
-  window.navigator.clipboard.writeText = async (t) => { copied = t; };
+  const { window, doc } = boot({ respond: ok(VERIFIED) });
+  window.navigator.clipboard.writeText = async (text) => { copied = text; };
 
-  await submit(doc, window, 'https://vplink.in/snB67M');
+  await submit(doc, window, 'https://youtu.be/fixtureVer1');
 
-  const btn = [...doc.querySelectorAll('button.btn')].find((b) => /Copy link/.test(b.textContent));
+  const btn = [...doc.querySelectorAll('button.btn')].find((b) => /Copy list/.test(b.textContent));
   btn.dispatchEvent(new window.Event('click', { bubbles: true }));
-  await tick();
+  await settle();
 
-  assert.equal(copied, REAL.finalUrl);
+  assert.equal(
+    copied,
+    '0:00 Introduction to Circular Motion\n' +
+      '1:35 Angular Displacement and Angular Velocity\n' +
+      '7:10 Centripetal Acceleration Derivation'
+  );
   assert.equal(btn.querySelector('.btn-label').textContent, 'Copied');
-  assert.equal(btn.querySelectorAll('span').length, 2, 'icon + label, no duplicated label');
   window.close();
 });
 
-test('a gated destination is labelled as gated, not as resolved', async () => {
-  const gated = {
-    ...REAL,
-    finalUrl: 'https://arolinks.com/short/K2x9',
-    finalHost: 'arolinks.com',
-    blocked: {
-      code: 'cloudflare',
-      label: 'Cloudflare bot check',
-      message: 'This page is an interactive verification gate.',
+test('copy with links includes a jump URL per topic', async () => {
+  let copied = null;
+  const { window, doc } = boot({ respond: ok(VERIFIED) });
+  window.navigator.clipboard.writeText = async (text) => { copied = text; };
+
+  await submit(doc, window, 'https://youtu.be/fixtureVer1');
+
+  const btn = [...doc.querySelectorAll('button.btn')].find((b) => /Copy with links/.test(b.textContent));
+  btn.dispatchEvent(new window.Event('click', { bubbles: true }));
+  await settle();
+
+  assert.match(copied, /^0:00\tIntroduction to Circular Motion\thttps:\/\/www\.youtube\.com\/watch\?v=fixtureVer1&t=0s/m);
+  assert.match(copied, /1:35\tAngular Displacement.*&t=95s/);
+  window.close();
+});
+
+test('sample buttons load and are labelled as samples', async () => {
+  const { window, doc } = boot({
+    respond: async (url) => {
+      if (url.includes('/api/samples/verified')) {
+        return { ok: true, status: 200, json: async () => ({ ...VERIFIED, sample: { key: 'verified', name: 'Circular Motion', blurb: 'b', note: 'This is a stored sample.' } }) };
+      }
+      return { ok: true, status: 200, json: async () => ({ ok: true, samples: [{ key: 'verified', name: 'Circular Motion', blurb: 'chapter sample' }] }) };
     },
-    warnings: ['Cloudflare bot check reached — the destination is behind human verification.'],
-  };
-  const { window, doc } = boot({ respond: async () => ({ ok: true, json: async () => gated }) });
-  await submit(doc, window, 'https://arolinks.com/short/K2x9');
+  });
 
-  assert.match(doc.querySelector('.result-top').textContent, /Gated/);
-  assert.doesNotMatch(doc.querySelector('.result-top').textContent, /Resolved/);
-  assert.match(doc.querySelector('.note').textContent, /Cloudflare bot check/);
-  assert.match(doc.querySelector('.final-label').textContent, /Last reachable URL/);
+  doc.querySelector('#demo-toggle').dispatchEvent(new window.Event('click', { bubbles: true }));
+  await settle();
+
+  const sampleBtn = doc.querySelector('.sample-btn');
+  assert.ok(sampleBtn, 'samples are listed');
+  sampleBtn.dispatchEvent(new window.Event('click', { bubbles: true }));
+  await settle();
+
+  assert.match(doc.querySelector('.banner').textContent, /Offline sample/);
+  assert.match(doc.querySelector('.banner').textContent, /Circular Motion/);
   window.close();
 });
 
-test('server errors and bad input surface as an alert, not a crash', async () => {
+test('errors surface as alerts, including the offline-server hint', async () => {
   const { window, doc } = boot({
     respond: async () => ({
       ok: false,
-      status: 422,
-      json: async () => ({ ok: false, error: "That doesn't look like a link.", code: 'INVALID_INPUT' }),
+      status: 502,
+      json: async () => ({ ok: false, error: "Couldn't reach YouTube (ENOTFOUND).", code: 'FETCH_FAILED' }),
     }),
   });
 
-  await submit(doc, window, 'hello there');
-  const alertBox = doc.querySelector('#alert');
-  assert.equal(alertBox.hidden, false);
-  assert.match(alertBox.textContent, /doesn't look like a link/);
+  await submit(doc, window, 'https://youtu.be/fixtureVer1');
+  const alertText = doc.querySelector('#alert').textContent;
+  assert.match(alertText, /Couldn't reach YouTube/);
+  assert.match(alertText, /offline samples/);
   assert.equal(doc.querySelector('#result').hidden, true);
   window.close();
 });
 
-test('a network failure explains the outbound-internet possibility', async () => {
+test('non-YouTube links are rejected in the UI', async () => {
   const { window, doc } = boot({
     respond: async () => ({
       ok: false,
       status: 422,
-      json: async () => ({ ok: false, error: "Couldn't reach the site (ECONNRESET).", code: 'FETCH_FAILED' }),
+      json: async () => ({ ok: false, error: 'Only YouTube links are supported right now.', code: 'NOT_YOUTUBE' }),
     }),
   });
-  await submit(doc, window, 'https://vplink.in/snB67M');
-  assert.match(doc.querySelector('#alert').textContent, /outbound internet/);
+
+  await submit(doc, window, 'https://vimeo.com/1');
+  assert.match(doc.querySelector('#alert').textContent, /Only YouTube/);
+  window.close();
+});
+
+test('empty submit is caught before any request', async () => {
+  let called = false;
+  const { window, doc } = boot({
+    respond: async () => { called = true; return { ok: true, status: 200, json: async () => VERIFIED }; },
+  });
+
+  doc.querySelector('#form').dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
+  await settle();
+
+  assert.equal(called, false);
+  assert.match(doc.querySelector('#alert').textContent, /Paste a YouTube link first/);
   window.close();
 });

@@ -8,6 +8,8 @@ COPY package.json ./
 COPY server.js ./
 COPY src ./src
 COPY public ./public
+COPY fixtures ./fixtures
+COPY scripts ./scripts
 
 EXPOSE 3000
 USER node
