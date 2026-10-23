@@ -12,7 +12,7 @@ const ROOT = path.join(__dirname, '..');
 const html = fs.readFileSync(path.join(ROOT, 'public', 'index.html'), 'utf8');
 const appJs = fs.readFileSync(path.join(ROOT, 'public', 'app.js'), 'utf8');
 
-function boot({ respond }) {
+function boot({ respond, health = true }) {
   const virtualConsole = new VirtualConsole();
   const errors = [];
   virtualConsole.on('jsdomError', (e) => errors.push(e));
@@ -27,7 +27,14 @@ function boot({ respond }) {
   const w = dom.window;
   w.HTMLElement.prototype.scrollIntoView = function () {};
   w.localStorage.clear();
-  w.fetch = async (url, init) => respond(String(url), init);
+  w.fetch = async (url, init) => {
+    // The page probes /api/health on load to tell "app down" from "lookup failed".
+    if (String(url).includes('/api/health')) {
+      if (health === false) throw new TypeError('Failed to fetch');
+      return { ok: true, status: 200, json: async () => ({ ok: true, budgetMs: 12000 }) };
+    }
+    return respond(String(url), init);
+  };
   w.navigator.clipboard = { writeText: async () => {} };
   w.eval(appJs);
 
@@ -289,5 +296,120 @@ test('empty submit is caught before any request', async () => {
 
   assert.equal(called, false);
   assert.match(doc.querySelector('#alert').textContent, /Paste a YouTube link first/);
+  window.close();
+});
+
+
+test('a gateway 502 with an HTML body is explained, not echoed as a status code', async () => {
+  const { window, doc } = boot({
+    respond: async () => ({
+      ok: false,
+      status: 502,
+      text: async () => '<html><body><h1>502 Bad Gateway</h1></body></html>',
+      json: async () => { throw new Error('not json'); },
+    }),
+  });
+
+  await submit(doc, window, 'https://youtu.be/fixtureVer1');
+
+  const alertBox = doc.querySelector('#alert');
+  assert.equal(alertBox.hidden, false);
+  const text = alertBox.textContent;
+  assert.match(text, /gateway/i);
+  assert.match(text, /proxy timeout|restarting preview/i);
+  assert.doesNotMatch(text, /^Lookup failed/, 'must not reduce the failure to a bare status code');
+  assert.equal(doc.querySelector('#result').hidden, true);
+  window.close();
+});
+
+test('a gateway body that is not JSON still offers a retry', async () => {
+  const { window, doc } = boot({
+    respond: async () => ({
+      ok: false,
+      status: 503,
+      text: async () => '<html>Service Unavailable</html>',
+    }),
+  });
+
+  await submit(doc, window, 'https://youtu.be/fixtureVer1');
+  const retry = doc.querySelector('.alert-retry');
+  assert.ok(retry, 'a retry button is offered for transient failures');
+  assert.equal(retry.textContent, 'Retry');
+  window.close();
+});
+
+test('retries once automatically, then renders when the gateway recovers', async () => {
+  let calls = 0;
+  const { window, doc } = boot({
+    respond: async () => {
+      calls += 1;
+      if (calls === 1) {
+        return { ok: false, status: 502, text: async () => '<html>502</html>' };
+      }
+      return { ok: true, status: 200, text: async () => JSON.stringify(VERIFIED), json: async () => VERIFIED };
+    },
+  });
+
+  await submit(doc, window, 'https://youtu.be/fixtureVer1');
+  await new Promise((r) => setTimeout(r, 700)); // the retry waits 500ms
+  await settle();
+
+  assert.equal(calls, 2, 'the request was retried exactly once');
+  assert.equal(doc.querySelector('#result').hidden, false);
+  assert.equal(doc.querySelector('#alert').hidden, true);
+  assert.match(doc.querySelector('.topic-list').textContent, /Circular Motion/);
+  window.close();
+});
+
+test('the retry button re-issues the same request', async () => {
+  let calls = 0;
+  const { window, doc } = boot({
+    respond: async () => {
+      calls += 1;
+      if (calls <= 2) return { ok: false, status: 502, text: async () => '<html>502</html>' };
+      return { ok: true, status: 200, text: async () => JSON.stringify(VERIFIED) };
+    },
+  });
+
+  await submit(doc, window, 'https://youtu.be/fixtureVer1');
+  await new Promise((r) => setTimeout(r, 700));
+  await settle();
+
+  const retry = doc.querySelector('.alert-retry');
+  assert.ok(retry, 'still failing after the automatic retry, so the user is offered one');
+  retry.dispatchEvent(new window.Event('click', { bubbles: true }));
+  await settle();
+
+  assert.equal(calls, 3);
+  assert.equal(doc.querySelector('#result').hidden, false);
+  window.close();
+});
+
+test('a dead server is reported as unreachable at boot', async () => {
+  const { window, doc } = boot({
+    health: false,
+    respond: async () => { throw new TypeError('Failed to fetch'); },
+  });
+
+  await settle();
+  const text = doc.querySelector('#alert').textContent;
+  assert.match(text, /Can't reach the app's server/);
+  window.close();
+});
+
+test('a JSON error from the server is shown verbatim with its hint', async () => {
+  const { window, doc } = boot({
+    respond: async () => ({
+      ok: false,
+      status: 502,
+      text: async () => JSON.stringify({ ok: false, error: 'YouTube took too long to answer.', code: 'TIMEOUT' }),
+    }),
+  });
+
+  await submit(doc, window, 'https://youtu.be/fixtureVer1');
+  const text = doc.querySelector('#alert').textContent;
+  assert.match(text, /YouTube took too long/);
+  assert.match(text, /stopped early/);
+  assert.ok(doc.querySelector('.alert-retry'));
   window.close();
 });

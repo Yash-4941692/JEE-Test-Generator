@@ -13,7 +13,7 @@ serves the UI and does the work.
 
 ```bash
 npm start        # http://localhost:3000
-npm test         # 83 tests
+npm test         # 94 tests
 npm run evaluate # measured accuracy on the labelled fixture
 ```
 
@@ -197,19 +197,50 @@ Any Node 20+ host works (Render, Railway, Fly, a VPS). **The host needs outbound
 to reach YouTube**; a sandboxed environment without it will return `FETCH_FAILED` and point
 you at the offline samples.
 
+## Troubleshooting
+
+**"The gateway returned HTTP 502" / a bare `HTTP 502`.**
+That is not the app failing — it is whatever sits in front of it (a preview proxy,
+load balancer, reverse proxy) giving up and sending its own error page instead of the
+app's JSON. The app now says so explicitly and offers **Retry**, instead of echoing a
+status code. Two things make this diagnosable:
+
+- Every API request is logged with its status and duration:
+  `2026-10-23T08:25:13.197Z POST /api/topics -> 502 (36ms)`. If you see the line,
+  the request reached the app and the status is real. If you see **nothing**, the
+  request never arrived and the problem is in front of the app.
+- `GET /api/health` reports the server budget: `{ ok, uptime, budgetMs, upstreamTimeoutMs }`.
+  The UI pings it on load to tell "app down" apart from "lookup failed".
+
+Requests run under a hard budget (`REQUEST_BUDGET_MS`, default **12000ms**) that is
+shorter than a typical proxy timeout, so a slow YouTube connection produces our own
+JSON `504 TIMEOUT` rather than a proxy's HTML 502. Upstream fetches use
+`UPSTREAM_TIMEOUT_MS` (default **8000ms**). Raise both if you host it behind something
+patient, lower them if your proxy is aggressive:
+
+```bash
+REQUEST_BUDGET_MS=20000 UPSTREAM_TIMEOUT_MS=15000 npm start
+```
+
+**"Couldn't reach YouTube (ECONNRESET / ENOTFOUND)".**
+The host has no outbound internet, or YouTube is blocked from it. Sandboxed previews
+behave this way. The offline samples still work; deploy somewhere with egress to
+resolve real videos.
+
 ## Tests
 
 ```
-test/util.test.js         9  time formatting, text extraction, entities
-test/youtube.test.js     13  URL shapes, embedded JSON, chapters, caption tracks
-test/description.test.js 14  chapter-list rules, confidence, false positives
-test/captions.test.js    19  every caption format, rolling ASR, pause splitting
+test/util.test.js         5  time formatting, text extraction, entities
+test/youtube.test.js     12  URL shapes, embedded JSON, chapters, caption tracks
+test/description.test.js 13  chapter-list rules, confidence, false positives
+test/captions.test.js    13  every caption format, rolling ASR, pause splitting
 test/topics.test.js      18  tier contract, cue detection, label cleanup, accuracy floor
-test/ui.test.js          11  real UI in jsdom: badges, links, copy, errors
-test/server.test.js      11  HTTP routes, samples, error codes, traversal
+test/ui.test.js          16  real UI in jsdom: badges, links, copy, errors, gateway failures
+test/server.test.js      12  HTTP routes, samples, error codes, traversal, health
+test/budget.test.js       5  request deadline behaviour
 ```
 
-The resolver tests use local fixtures and mock responses, so the suite runs offline.
+The tests use local fixtures and mock responses, so the suite runs offline.
 
 ## Licence
 

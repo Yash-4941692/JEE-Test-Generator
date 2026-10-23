@@ -176,6 +176,17 @@ body {
   color: #fecaca;
 }
 .alert.soft { border-color: rgba(251,191,36,0.3); background: rgba(251,191,36,0.08); color: #fde68a; }
+.alert { display: flex; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+.alert > span { flex: 1; min-width: 200px; }
+.alert-retry {
+  flex: none; font: inherit; font-size: 12px; font-weight: 600;
+  padding: 5px 12px; border-radius: 8px; cursor: pointer;
+  border: 1px solid rgba(255,255,255,0.28);
+  background: rgba(255,255,255,0.1);
+  color: inherit;
+  transition: 0.15s ease;
+}
+.alert-retry:hover { background: rgba(255,255,255,0.2); }
 
 /* ---------- result ---------- */
 .result { margin-top: 24px; animation: rise 0.35s cubic-bezier(0.2, 0.8, 0.3, 1); }

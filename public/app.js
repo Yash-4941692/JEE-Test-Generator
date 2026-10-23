@@ -49,6 +49,7 @@ const ICON = {
  * ------------------------------------------------------------------ */
 let inFlight = null;
 let lastReport = null;
+let lastRequest = null;
 
 function setLoading(on) {
   go.classList.toggle('loading', on);
@@ -56,8 +57,24 @@ function setLoading(on) {
   go.querySelector('.label').textContent = on ? 'Reading…' : 'Find topics';
 }
 
-function showAlert(message, kind = 'error') {
-  alertBox.textContent = message;
+function showAlert(message, options = {}) {
+  if (typeof options === 'string') options = { kind: options };
+  const kind = options.kind || 'error';
+
+  alertBox.replaceChildren(el('span', { text: message }));
+  if (typeof options.retry === 'function') {
+    alertBox.append(
+      el('button', {
+        class: 'alert-retry',
+        type: 'button',
+        onclick: () => {
+          const retry = options.retry;
+          clearAlert();
+          retry();
+        },
+      }, 'Retry')
+    );
+  }
   alertBox.className = 'alert' + (kind === 'soft' ? ' soft' : '');
   alertBox.hidden = !message;
 }
@@ -121,6 +138,81 @@ function timeListText(report) {
 }
 
 /* ------------------------------------------------------------------ *
+ * Response reading
+ *
+ * A gateway in front of the app (preview proxy, load balancer) sends its own
+ * HTML error page when it gives up, so the response is not always our JSON.
+ * Reading the body defensively is what turns an unexplainable "HTTP 502" into
+ * a message a user can act on.
+ * ------------------------------------------------------------------ */
+const GATEWAY_STATUSES = new Set([502, 503, 504]);
+
+async function readPayload(res) {
+  let text = '';
+
+  if (typeof res.text === 'function') {
+    try {
+      text = await res.text();
+    } catch {
+      text = '';
+    }
+  }
+
+  let data = null;
+  if (text) {
+    try { data = JSON.parse(text); } catch { data = null; }
+  }
+
+  // Some environments only expose json(); fall back to it rather than losing
+  // a perfectly good error payload.
+  if (!data && !text && typeof res.json === 'function') {
+    try { data = await res.json(); } catch { data = null; }
+  }
+
+  return { data, text };
+}
+
+function looksLikeHtml(text) {
+  return /^\s*</.test(text || '');
+}
+
+function describeFailure(res, data, text) {
+  if (data && data.error) {
+    const code = data.code;
+    let message = data.error;
+
+    if (code === 'FETCH_FAILED' || code === 'PAGE_UNREADABLE') {
+      message +=
+        ' YouTube may be unreachable from this server — a hosted preview often has no outbound internet. The offline samples still work.';
+    }
+    if (code === 'TIMEOUT') {
+      message += ' The request was stopped early so it would not hang.';
+    }
+    return {
+      message,
+      kind: code === 'RATE_LIMITED' ? 'soft' : 'error',
+      retryable: code !== 'RATE_LIMITED',
+    };
+  }
+
+  if (GATEWAY_STATUSES.has(res.status)) {
+    return {
+      message: looksLikeHtml(text)
+        ? `The gateway in front of the app returned HTTP ${res.status} instead of a reply from the server. That is a proxy timeout or a restarting preview — not a problem with the link you pasted. Try again in a moment.`
+        : `The server returned HTTP ${res.status} without details. That is usually a transient proxy timeout — try again.`,
+      kind: 'soft',
+      retryable: true,
+    };
+  }
+
+  return {
+    message: `Lookup failed with HTTP ${res.status}.`,
+    kind: 'error',
+    retryable: res.status >= 500,
+  };
+}
+
+/* ------------------------------------------------------------------ *
  * submit
  * ------------------------------------------------------------------ */
 form.addEventListener('submit', (e) => {
@@ -135,13 +227,43 @@ input.addEventListener('keydown', (e) => {
   }
 });
 
-async function run(value, { sample = null } = {}) {
+const CLIENT_TIMEOUT_MS = 25000;
+
+function requestSignal(controller) {
+  if (typeof AbortSignal === 'undefined' || typeof AbortSignal.any !== 'function') {
+    return controller.signal;
+  }
+  return AbortSignal.any([controller.signal, AbortSignal.timeout(CLIENT_TIMEOUT_MS)]);
+}
+
+async function sendRequest(value, sample, controller) {
+  const signal = requestSignal(controller);
+  return sample
+    ? fetch(`/api/samples/${encodeURIComponent(sample)}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: '{}',
+        signal,
+      })
+    : fetch('/api/topics', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ url: value }),
+        signal,
+      });
+}
+
+async function run(value, { sample = null, attempt = 0 } = {}) {
   const raw = (value || '').trim();
   if (!sample && !raw) {
     showAlert('Paste a YouTube link first.');
     input.focus();
+checkHealth();
     return;
   }
+
+  // Remembered so a Retry button can repeat exactly this request.
+  lastRequest = { value: raw, sample };
 
   clearAlert();
   setLoading(true);
@@ -151,40 +273,69 @@ async function run(value, { sample = null } = {}) {
   inFlight = new AbortController();
 
   try {
-    const res = sample
-      ? await fetch(`/api/samples/${encodeURIComponent(sample)}`, {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: '{}',
-          signal: inFlight.signal,
-        })
-      : await fetch('/api/topics', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ url: raw }),
-          signal: inFlight.signal,
-        });
-
-    const data = await res.json().catch(() => null);
+    const res = await sendRequest(raw, sample, inFlight);
+    const { data, text } = await readPayload(res);
 
     if (!res.ok || !data || data.ok === false) {
-      const message = (data && data.error) || `Lookup failed (HTTP ${res.status}).`;
-      if (data && data.code === 'RATE_LIMITED') return showAlert(message, 'soft');
-      if (data && (data.code === 'FETCH_FAILED' || data.code === 'PAGE_UNREADABLE')) {
-        return showAlert(`${message} A hosted preview may have no outbound internet — try the offline samples.`);
+      const failure = describeFailure(res, data, text);
+
+      // Tell the user right away, then quietly try once more behind the
+      // message — gateways hiccup, and waiting in silence looks like a hang.
+      showAlert(failure.message, {
+        kind: failure.kind,
+        retry: failure.retryable ? () => run(raw, { sample }) : undefined,
+      });
+
+      if (failure.retryable && attempt === 0) {
+        setTimeout(() => run(raw, { sample, attempt: 1 }), 600);
       }
-      return showAlert(message);
+      return;
     }
 
     lastReport = data;
     render(data);
     if (!data.sample && raw) addHistory({ ...data, input: raw });
   } catch (err) {
-    if (err.name === 'AbortError') return;
-    showAlert("Couldn't reach the server. Is it running?");
+    if (err && err.name === 'AbortError') return;
+
+    if (err && (err.name === 'TimeoutError' || err.name === 'Timeout')) {
+      return showAlert(
+        'The request took too long and was cancelled. A preview proxy may be dropping it — try again, or use the offline samples.',
+        { kind: 'soft', retry: () => run(raw, { sample }) }
+      );
+    }
+
+    // A failed fetch here means the browser never got a response at all.
+    showAlert(
+      "Couldn't reach the app's server at all — the connection failed before any response came back. If this is a hosted preview it may be restarting.",
+      { kind: 'soft', retry: () => run(raw, { sample }) }
+    );
+    if (attempt === 0) setTimeout(() => run(raw, { sample, attempt: 1 }), 600);
   } finally {
     setLoading(false);
     inFlight = null;
+  }
+}
+
+/**
+ * Ask the server whether it is actually up. This is what separates "the app is
+ * down" from "the video lookup failed" when a user reports an error.
+ */
+async function checkHealth() {
+  try {
+    const res = await fetch('/api/health', {
+      signal: typeof AbortSignal.timeout === 'function' ? AbortSignal.timeout(6000) : undefined,
+    });
+    if (!res.ok) throw new Error('bad status');
+    const data = await res.json();
+    if (!data || !data.ok) throw new Error('bad payload');
+    return true;
+  } catch {
+    showAlert(
+      "Can't reach the app's server right now — the preview may still be starting. Give it a few seconds and try again.",
+      { kind: 'soft', retry: () => { clearAlert(); checkHealth(); } }
+    );
+    return false;
   }
 }
 
@@ -480,3 +631,4 @@ function addHistory(report) {
  * boot
  * ------------------------------------------------------------------ */
 input.focus();
+checkHealth();

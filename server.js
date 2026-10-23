@@ -8,10 +8,19 @@ const path = require('node:path');
 const { analyse } = require('./src/topics');
 const { YouTubeError } = require('./src/youtube');
 const { runSample, listSamples } = require('./src/demo');
+const { withBudget, BudgetExceeded } = require('./src/budget');
 
 const PORT = Number(process.env.PORT) || 3000;
 const HOST = process.env.HOST || '0.0.0.0';
 const PUBLIC_DIR = path.join(__dirname, 'public');
+
+// Answer before any gateway in front of us gives up. A proxy that times out
+// returns its own HTML error page, which the browser can only report as a bare
+// "HTTP 502" — so we send JSON first, always.
+const REQUEST_BUDGET_MS = Number(process.env.REQUEST_BUDGET_MS) || 12000;
+const UPSTREAM_TIMEOUT_MS = Number(process.env.UPSTREAM_TIMEOUT_MS) || 8000;
+
+const log = (...parts) => console.log(new Date().toISOString(), ...parts);
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -110,18 +119,15 @@ async function serveStatic(req, res, pathname) {
   }
 }
 
-/* --- server -------------------------------------------------------------- */
-const server = http.createServer(async (req, res) => {
-  let pathname = '/';
-  try {
-    pathname = new URL(req.url, 'http://localhost').pathname;
-  } catch {
-    res.writeHead(400).end('Bad request');
-    return;
-  }
-
+/* --- routing ------------------------------------------------------------- */
+async function route(req, res, pathname) {
   if (pathname === '/api/health') {
-    return sendJson(res, 200, { ok: true, uptime: Math.round(process.uptime()) });
+    return sendJson(res, 200, {
+      ok: true,
+      uptime: Math.round(process.uptime()),
+      budgetMs: REQUEST_BUDGET_MS,
+      upstreamTimeoutMs: UPSTREAM_TIMEOUT_MS,
+    });
   }
 
   if (pathname === '/api/samples' && req.method === 'GET') {
@@ -135,11 +141,11 @@ const server = http.createServer(async (req, res) => {
       if (!report) return sendJson(res, 404, { ok: false, error: 'Unknown sample.', code: 'NOT_FOUND' });
       return sendJson(res, 200, report);
     } catch (err) {
+      log('sample failed', key, err && err.message);
       return sendJson(res, 500, {
         ok: false,
         error: 'That sample failed to run.',
         code: 'SAMPLE_FAILED',
-        detail: String(err && err.message),
       });
     }
   }
@@ -178,11 +184,26 @@ const server = http.createServer(async (req, res) => {
     }
 
     try {
-      const report = await analyse(payload.url ?? '', {});
+      // Never wait longer than our own budget — answer with JSON before a proxy
+      // in front of us times out and replaces the response with its own page.
+      const report = await withBudget(
+        () => analyse(payload.url ?? '', { timeoutMs: UPSTREAM_TIMEOUT_MS }),
+        REQUEST_BUDGET_MS
+      );
       return sendJson(res, 200, report);
     } catch (err) {
+      if (err instanceof BudgetExceeded) {
+        log('budget exceeded after', err.budgetMs + 'ms');
+        return sendJson(res, 504, {
+          ok: false,
+          error: 'YouTube took too long to answer, so the lookup was stopped before the request timed out. Try again, or use the offline samples.',
+          code: 'TIMEOUT',
+        });
+      }
+
       const known = err instanceof YouTubeError;
       const status = known ? STATUS_FOR_CODE[err.code] || 500 : 500;
+      if (!known) log('unexpected analysis error:', err && (err.stack || err.message));
       return sendJson(res, status, {
         ok: false,
         error: known ? err.message : 'Something went wrong while reading that video.',
@@ -202,10 +223,56 @@ const server = http.createServer(async (req, res) => {
   }
 
   return serveStatic(req, res, pathname);
+}
+
+/* --- server -------------------------------------------------------------- */
+const server = http.createServer(async (req, res) => {
+  const startedAt = Date.now();
+  let pathname = '/';
+
+  try {
+    pathname = new URL(req.url, 'http://localhost').pathname;
+  } catch {
+    res.writeHead(400).end('Bad request');
+    return;
+  }
+
+  // One log line per request: this is how you tell an app failure apart from a
+  // gateway failure. If the browser reports an error and nothing appears here,
+  // the request never reached the app.
+  res.on('finish', () => {
+    if (!pathname.startsWith('/api/')) return;
+    log(`${req.method} ${pathname} -> ${res.statusCode} (${Date.now() - startedAt}ms)`);
+  });
+
+  try {
+    await route(req, res, pathname);
+  } catch (err) {
+    log('handler crashed:', err && (err.stack || err.message));
+    if (!res.headersSent) {
+      sendJson(res, 500, {
+        ok: false,
+        error: 'The server hit an unexpected error while handling that request.',
+        code: 'INTERNAL',
+      });
+    } else {
+      res.end();
+    }
+  }
+});
+
+// Keep serving: a stray rejection must not take the whole app down, because a
+// dead app behind a proxy is indistinguishable from a gateway error to a user.
+process.on('unhandledRejection', (reason) => {
+  log('unhandled rejection:', reason && (reason.stack || reason.message || reason));
+});
+process.on('uncaughtException', (err) => {
+  log('uncaught exception:', err && (err.stack || err.message));
 });
 
 server.listen(PORT, HOST, () => {
-  console.log(`Topic Timestamps running on http://${HOST}:${PORT}`);
+  console.log(`Chapter One running on http://${HOST}:${PORT}`);
+  log(`budget ${REQUEST_BUDGET_MS}ms, upstream timeout ${UPSTREAM_TIMEOUT_MS}ms`);
 });
 
 process.on('SIGTERM', () => server.close(() => process.exit(0)));
