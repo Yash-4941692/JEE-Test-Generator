@@ -246,7 +246,11 @@ function render(data) {
         meta.push(el('span', { class: 'tag k-' + s.kind, text: prevKindLabel }));
       }
       if (s.status) meta.push(el('span', { class: 'tag', text: 'HTTP ' + s.status }));
-      if (s.note && !s.note.startsWith('HTTP')) meta.push(el('span', { class: 'tag', text: s.note }));
+      // Notes that just restate the kind label are noise ("Script redirect | JavaScript redirect").
+      const GENERIC_NOTE = /^(http \d{3}|meta refresh|javascript redirect|script redirect|destination in json|plain-text url|landed here|short link)$/i;
+      if (s.note && s.note !== prevKindLabel && !GENERIC_NOTE.test(s.note)) {
+        meta.push(el('span', { class: 'tag', text: s.note }));
+      }
 
       chain.append(
         el(

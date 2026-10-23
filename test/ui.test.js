@@ -140,6 +140,8 @@ test('demo chain renders every hop exactly once, with the destination last', asy
   // destination row is flagged final and tagged once
   const last = doc.querySelector('.hop.final');
   assert.match(last.textContent, /Destination/);
+  assert.doesNotMatch(last.textContent, /JavaScript redirect/,
+    'generic note must not repeat the kind label');
   const urlRows = [...doc.querySelectorAll('.hop-url')].filter(
     (n) => n.textContent === '/demo/destination'
   );
