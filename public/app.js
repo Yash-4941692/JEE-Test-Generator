@@ -327,7 +327,7 @@ async function checkHealth() {
       signal: typeof AbortSignal.timeout === 'function' ? AbortSignal.timeout(6000) : undefined,
     });
     if (!res.ok) throw new Error('bad status');
-    const data = await res.json();
+    const data = typeof res.json === 'function' ? await res.json() : null;
     if (!data || !data.ok) throw new Error('bad payload');
     return true;
   } catch {

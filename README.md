@@ -212,10 +212,10 @@ status code. Two things make this diagnosable:
 - `GET /api/health` reports the server budget: `{ ok, uptime, budgetMs, upstreamTimeoutMs }`.
   The UI pings it on load to tell "app down" apart from "lookup failed".
 
-Requests run under a hard budget (`REQUEST_BUDGET_MS`, default **12000ms**) that is
+Requests run under a hard budget (`REQUEST_BUDGET_MS`, default **10000ms**) that is
 shorter than a typical proxy timeout, so a slow YouTube connection produces our own
 JSON `504 TIMEOUT` rather than a proxy's HTML 502. Upstream fetches use
-`UPSTREAM_TIMEOUT_MS` (default **8000ms**). Raise both if you host it behind something
+`UPSTREAM_TIMEOUT_MS` (default **7000ms**). Raise both if you host it behind something
 patient, lower them if your proxy is aggressive:
 
 ```bash

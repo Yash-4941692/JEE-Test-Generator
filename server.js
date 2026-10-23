@@ -17,8 +17,8 @@ const PUBLIC_DIR = path.join(__dirname, 'public');
 // Answer before any gateway in front of us gives up. A proxy that times out
 // returns its own HTML error page, which the browser can only report as a bare
 // "HTTP 502" — so we send JSON first, always.
-const REQUEST_BUDGET_MS = Number(process.env.REQUEST_BUDGET_MS) || 12000;
-const UPSTREAM_TIMEOUT_MS = Number(process.env.UPSTREAM_TIMEOUT_MS) || 8000;
+const REQUEST_BUDGET_MS = Number(process.env.REQUEST_BUDGET_MS) || 10000;
+const UPSTREAM_TIMEOUT_MS = Number(process.env.UPSTREAM_TIMEOUT_MS) || 7000;
 
 const log = (...parts) => console.log(new Date().toISOString(), ...parts);
 
